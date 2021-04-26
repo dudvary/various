@@ -1,0 +1,84 @@
+' Script to extract Spike Latencies
+' Print Latencies for each stimulus/event to Log1 in format (click on window and then on Log1): 
+'   #Event,Latency[s],StimulusInterval[s],SpikeWithinStimulusInterval,
+'   prints then for each event:
+'       number of stimuli (#Event),
+'       time period to the first spike from the event (Latency),
+'       time period between the stimuli (StimulusInterval) 
+'           NOTE: The last stimulus will have a longer stimulus interval until maximum recording time
+'       boolean whether spike was within stimulus interval (1: within interval, 0: not within interval) 
+'       tLatency<tStimulus (SpikeWithinStimulusInterval)
+'
+' User is prompted to open Data file with traces
+' User is asked to select Channel with Events\Triggers, WaveMarkChannel with Spikes
+' 
+' ------------------------
+' Author: Daniel Udvary
+' Date: July 25 2018
+' Version: 2
+' ------------------------
+
+FilePathSet("\\\\IBS9010\\current_data\\Data_Mike\\Spike2\\");
+var data%:= FileOpen("",0,1); 
+
+if data% > 0 then
+    
+    ' Default channel numbers for event/trigger/stimulus channel
+    ' and spike channel (either wavemark or event channel)
+    var chEvents% := 6; 
+    var chSpikes% := 5;
+
+    ' Open Dialog Box for Channel Settings to extract Spike Latencies
+    DlgCreate("Channel Settings");
+    DlgChan(1,"TriggerChannel",2); ' Only Event Channels
+    DlgChan(2,"SpikeChannel",18); ' Event (2) and Wavemark (16) Channels
+    var ok := DlgShow(chEvents%, chSpikes%);
+
+    'If pressed OK
+    if ok=1 then
+        
+        ' Check if there are any Events in Channel
+        var numEvents% := Count(chEvents%,0,MaxTime()); 
+        var numSpikes% := Count(chSpikes%,0,MaxTime()); 
+        
+        if (numEvents%>0 and numSpikes%>0) then
+            
+            ' Print out results
+            PrintLog("#Event,Latency[s],StimulusInterval[s],SpikeWithinStimulusInterval,LatenciesOfRemainingSpikesWithinStimulusInterval[s],\n");    
+        
+            var event%;
+            
+            ' Time point of first Event
+            var tprevious := NextTime(chEvents%,-1);
+            
+            for event% := 1 to numEvents% do
+                
+                ' Time points of Interest
+                ' First Time of Spike After Stimulus
+                var tFirstSpike := NextTime(chSpikes%,tprevious);
+                
+                ' Calculate Spike Latency
+                var tLatency := tFirstSpike-tprevious;
+                
+                ' Next Time of Stimulus
+                var tnext := NextTime(chEvents%,tprevious);
+                
+                ' If negative time, no more stimulus, use maximum time instead
+                if tnext<0 then
+                    tnext := MaxTime();
+                endif;
+                
+                ' Calculate Stimulus Interval
+                var tStimulus := tnext-tprevious;
+                
+                ' Print Latency and note whether spike is within stimulus interval
+                PrintLog("%d,%.4f,%.4f,%d,\n",event%,tLatency,tStimulus,tLatency<tStimulus);
+                
+                tprevious := tnext;
+            next;
+        else
+            PrintLog("ERROR! Found %d events in Channel %d and %d spikes in Channel %d\n",numEvents%,chEvents%,numSpikes%,chSpikes%);          
+        endif;
+        FrontView(LogHandle());
+    endif;
+endif;

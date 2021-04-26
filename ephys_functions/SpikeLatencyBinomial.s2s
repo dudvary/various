@@ -1,0 +1,90 @@
+' Compute probability of a spike being due to spontaneous activity
+' based on Poisson + Binomial Distribution
+' DialogBox Inputs:
+' - Number of Trials
+' - Bin Size in Seconds
+' - Spontaneous Activity in Hertz
+' - Significance Level
+' Prints in LogView / Outputs: 
+' - Binomial Coefficient
+' - Poisson Probability of One Spike in one Trial in One Bin
+' - Probability of Evoked Spike being Spontaneous
+' - Significance: p < alphaLevel
+' ------------------------------------------------
+' Authors: Daniel Udvary
+' Date: June 4th 2018
+' Version: 1
+' ------------------------------------------------
+
+' Default Values
+var binsz := 0.001;
+var spontActivity := 1;
+var alphaLevel := 0.01;
+var numTrials% := 30;
+
+' Open Dialog Box for Channel Settings to extract Spike Latencies
+' Update default Values
+DlgCreate("Calculate Spikes required to be above threshold");
+DlgInteger(1,"Number of trials",1,10000);
+DlgReal(2,"bin size [in seconds]",0,60);
+DlgReal(3,"Spontaneous Activity [in Hertz]",0,10000);
+DlgReal(4,"Significance Level",0,1);
+var ok := DlgShow(numTrials%,binsz,spontActivity,alphaLevel);
+
+'If pressed OK
+if ok=1 then
+        
+    ' Header
+    if (binsz>0.005) then
+        PrintLog("NOTE: Choose Bin Size resolution for single spikes only. Bins of 0.005sec might contain more than 1 spike!");
+    endif;
+    
+    PrintLog("--------------------------------------\n");
+    PrintLog("#trials,#spikes,");
+    PrintLog("BinomialCoefficient,OngoingSpikeRate[Hz],EvokedWindow[ms],");
+    PrintLog("PoissonProbabilityOfOneSpikePerTrialPerBin,");
+    PrintLog("ProbabilityOfEvokedSpikeBeingSpontaneous,Significance,\n");
+    
+    var p := 1;
+    var numSpikes% := 0;
+    
+    ' Probability of one (!) spike in one trial in one bin
+    var poissonProbability := poiss(spontActivity*binsz,1);   
+    
+    while (p>alphaLevel) AND (numSpikes%<=numTrials%) do
+                
+        numSpikes% := numSpikes% + 1;   
+        
+        ' Calculate Binomial Coefficient
+        var BinomC := BinomialC(numTrials%,numSpikes%);
+        
+        ' Calculate probability of seeing numSpikes in numTrials given probability of poisson
+        p := BinomC * pow(poissonProbability,numSpikes%) * pow(1-poissonProbability,numTrials%-numSpikes%);
+        
+        ' Print Results
+        PrintLog("%d,%d,",numTrials%,numSpikes%);  
+        PrintLog("%f,%f,%f,%f,%f,%d,\n",BinomC,spontActivity,binsz,poissonProbability,p,p<alphaLevel);  
+    wend;    
+    
+    PrintLog("--------------------------------------\n");
+    
+    FrontView(LogHandle())
+endif;
+
+' Compute Factorial
+func factorial(n%) 
+
+    var fact := 1;
+    var ntmp%;
+    for ntmp% := 1 to n% do
+        fact := fact*ntmp%;
+    next;
+
+    return fact;
+end;
+
+' Compute Poisson
+func poiss(r,n%)
+    var tmp := exp(-r)*pow(r,n%)/factorial(n%);
+    return tmp;
+end;

@@ -1,0 +1,130 @@
+' Compute probability of a spike being due to spontaneous activity
+' based on Poisson + Binomial Distribution for a data file
+'   User is prompted to open Data file with traces
+'   User is asked to select Settings of PSTH and Channels
+'   User is asked to put in spontaneous activity and significance level
+'   Create PSTH and print PSTH as text in Log1 in format (click on window and then on Log1): 
+'       - starting time of bin
+'       - number of Spikes in bin
+'       - Poisson Probability of One Spike in one Trial in One Bin
+'       - Probability of Evoked Spike being Spontaneous
+'       - Significance: p < alphaLevel
+' ------------------------------------------------
+' Authors: Daniel Udvary
+' Date: June 4th 2018
+' Version: 1
+' ------------------------------------------------
+
+FilePathSet("");
+var data%:= FileOpen("",0,1); 
+
+if data% > 0 then
+    
+    var chEvents% := 4; 
+    var chSpikes% := 2;
+    var bins% := 1200;
+    var binsz := 0.001;
+    var offset := 0.2; 
+    var spontActivity := 1;
+    var alphaLevel := 0.01;
+    
+    ' Open Dialog Box for Channel Settings to extract Spike Latencies
+    DlgCreate("Channel and PSTH Settings");
+    DlgChan(1,"TriggerChannel",2);
+    DlgChan(2,"SpikeChannel",16);
+    DlgInteger(3,"PSTH: #bins",1,10000);
+    DlgReal(4,"PSTH: bin size [in seconds]",0,60);
+    DlgReal(5,"PSTH: offset/pretrigger time [in seconds]",0,600);
+    DlgReal(6,"Spontaneous Activity [in Hertz]",0,10000);
+    DlgReal(7,"Significance Level",0,1);
+    var ok := DlgShow(chEvents%,chSpikes%,bins%,binsz,offset,spontActivity,alphaLevel);
+    
+    'If pressed OK
+    if ok=1 then
+        
+        FrontView(data%);
+        var PSTH% := SetPsth(chSpikes%,bins%,binsz,offset,chEvents%,2);
+        WindowVisible(1);
+        Process(0.0, Maxtime(), 0, 3);
+        View(PSTH%).WindowTitle$("PSTH");
+        FrontView(PSTH%);
+        
+        ' Header
+        if (binsz>0.005) then
+            PrintLog("NOTE: Choose Bin Size resolution for single spikes only. Bins of 0.005sec might contain more than 1 spike!");
+        endif;
+        
+        ' Go through all bins and extract frequency
+        PrintLog("--------------------------------------\n");
+        PrintLog("Time,NumSpikesInBin,PoissonProbabilityOfOneSpikePerTrialPerBin,pValue,Significance,\n");
+        var b%;
+        var signFound% := 0;
+        var Latency := -1; 
+        var numTrials% := Sweeps();
+        
+        ' Probability of one (!) spike in one trial in one bin
+        var poissonProbability := poiss(spontActivity*binsz,1);
+        
+        for b%:=0 to bins%-1 do
+        
+            var t := BinToX(b%);           
+            var numSpikes% := ChanValue(1,t+binsz/2,PSTH%);   
+            var pValue := 1; 
+            
+            if (numSpikes%>0) then
+               ' Calculate Binomial Coefficient
+                var BinomC := BinomialC(numTrials%,numSpikes%); 
+                
+                ' Calculate probability of seeing numSpikes in numTrials given probability of poisson
+                pValue := BinomC * pow(poissonProbability,numSpikes%) * pow(1-poissonProbability,numTrials%-numSpikes%);
+                        
+            endif;
+         
+            var sign% := pValue<alphaLevel;            
+            
+            if ((sign%=1) AND (signFound%=0) AND t>0) then
+                Latency := t;
+                signFound% := 1;
+            endif;
+            
+            PrintLog("%f,%d,%f,%f,%d\n", t, numSpikes%, poissonProbability, pValue, sign%);
+        next;
+        
+        PrintLog("\n");
+        PrintLog("--------------------------------------\n");
+
+        if (signFound%=1) then
+            PrintLog("Latency[sec],%f\n", Latency);
+        else
+            PrintLog("No spike rate above significance level found!\n");
+        endif;
+        
+        PrintLog("SignificanceLevel,%f\n", alphaLevel);
+        PrintLog("SpontaneousActivity[Hz],%f\n", spontActivity);
+        PrintLog("BinSize[s],%f\n", binsz);
+        PrintLog("NumberOfBins,%d\n", bins%);  
+        PrintLog("NumberOfTrials,%d\n", numTrials%);  
+        
+    endif;
+    
+    FrontView(LogHandle())
+
+endif;
+
+' Compute Factorial
+func factorial(n%) 
+
+    var fact := 1;
+    var ntmp%;
+    for ntmp% := 1 to n% do
+        fact := fact*ntmp%;
+    next;
+
+    return fact;
+end;
+
+' Compute Poisson
+func poiss(r,n%)
+    var tmp := exp(-r)*pow(r,n%)/factorial(n%);
+    return tmp;
+end;

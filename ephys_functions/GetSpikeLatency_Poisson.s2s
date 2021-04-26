@@ -1,0 +1,153 @@
+' Compute Spike Latency based on Poisson Distribution for spontaneous Activity
+'   User is prompted to open Data file with traces
+'   User is asked to select Settings of PSTH and Channels
+'   User is asked to put in spontaneous activity and significance level
+'   Create PSTH and print PSTH as text in Log1 in format (click on window and then on Log1): 
+'   time,frequency[Hz],pValue,significance,
+'   prints then for each bin of PSTH:
+'       starting time of bin
+'       frequency recorded in this bin (average over trials) in Hertz
+'       pValue (probability of observing less spikes than given spontaneous Activity)
+'       significance (either 0 or 1, pValue<significance level)
+'
+'   prints Latency (first significant bin for t>0)
+'   prints Significance Level used for analysis
+'   prints SpontaneousActivity used for analysis
+'   prints BinSize used for analysis
+'   prints NumberOfBins used for analysis
+'
+' ------------------------------------------------
+' Authors: Daniel Udvary
+' Date: May 30th 2018
+' Version: 1
+' ------------------------------------------------
+
+FilePathSet("\\\\IBS9010\\current_data\\Data_Mike\\Spike2\\");
+var data%:= FileOpen("",0,1); 
+
+if data% > 0 then
+    
+    var chEvents% := 4; 
+    var chSpikes% := 2;
+    var bins% := 1200;
+    var binsz := 0.001;
+    var offset := 0.2; 
+    var spontActivity := 1;
+    var alphaLevel := 0.01;
+    
+    ' Open Dialog Box for Channel Settings to extract Spike Latencies
+    DlgCreate("Channel and PSTH Settings");
+    DlgChan(1,"TriggerChannel",2);
+    DlgChan(2,"SpikeChannel",16);
+    DlgInteger(3,"PSTH: #bins",1,10000);
+    DlgReal(4,"PSTH: bin size [in seconds]",0,60);
+    DlgReal(5,"PSTH: offset/pretrigger time [in seconds]",0,600);
+    DlgReal(6,"Spontaneous Activity [in Hertz]",0,10000);
+    DlgReal(7,"Significance Level",0,1);
+    var ok := DlgShow(chEvents%,chSpikes%,bins%,binsz,offset,spontActivity,alphaLevel);
+    
+    'If pressed OK
+    if ok=1 then
+        
+        FrontView(data%);
+        var PSTH% := SetPsth(chSpikes%,bins%,binsz,offset,chEvents%,2);
+        WindowVisible(1);
+        Process(0.0, Maxtime(), 0, 3);
+        View(PSTH%).WindowTitle$("PSTH");
+        FrontView(PSTH%);
+        
+        ' Go through all bins and extract frequency
+        PrintLog("time,numSpikes,pValue,significance,\n");
+        var b%;
+        var signFound% := 0;
+        var Latency := -1; 
+        var numTrials% := Sweeps();
+        var expectedNumSpikes := spontActivity * binsz * numTrials%; 
+        
+        for b%:=0 to bins%-1 do
+        
+            var t := BinToX(b%);           
+            var numSpikes := ChanValue(1,t+binsz/2,PSTH%);            
+            'var pValue := 1; 
+            'var sign% := 0; 
+            
+            ' Use Gamma Distribution (=CDF of Poisson) to 
+            ' compute actual p value (probability of observing a value less than frequency)
+            ' GammaP(n,r) with n = actual number of events, r = expected rate
+            ' Matlab Verification
+            '   1-sum(poisspdf([0:n-1],r)) == gammainc(r,n)
+            var pValue := GammaP(numSpikes+1,expectedNumSpikes);
+            var sign% := pValue<alphaLevel;            
+            
+            ' If spikes were detected in bin and rate>0
+            'if (numSpikes>0) AND (expectedNumSpikes>0) then
+                ' Use Gamma Distribution (=CDF of Poisson) to 
+                ' compute actual p value (probability of observing a value less than frequency)
+                ' GammaP(n,r) with n = actual number of events, r = expected rate
+                ' Matlab Verification
+                '   1-sum(poisspdf([0:n-1],r)) == gammainc(r,n)
+                'pValue := GammaP(numSpikes+1,expectedNumSpikes);
+                'sign% := pValue<alphaLevel;
+            'else ' otherwise
+             '   if numSpikes>0 then ' spikes detected, but rate=0
+             '       pValue := 0;
+             '       sign% := 1;
+              '  else ' no spikes detected, but rate>0
+              '      pValue := 1;
+              '      sign% := 0;
+              '  endif;
+            'endif;
+            
+            if ((sign%=1) AND (signFound%=0) AND t>0) then
+                Latency := t;
+                signFound% := 1;
+            endif;
+            
+            PrintLog("%f,%f,%f,%d\n", t, numSpikes, pValue, sign%);
+        next;
+        
+        PrintLog("\n");
+        if (signFound%=1) then
+            PrintLog("Latency[sec],%f\n", Latency);
+        else
+            PrintLog("No spike rate above significance level found!\n");
+        endif;
+        
+        PrintLog("SignificanceLevel,%f\n", alphaLevel);
+        PrintLog("SpontaneousActivity[Hz],%f\n", spontActivity);
+        PrintLog("BinSize[s],%f\n", binsz);
+        PrintLog("NumberOfBins,%d\n", bins%);  
+        PrintLog("NumberOfTrials,%d\n", numTrials%);  
+        
+        ' Compute when poisson probability exceeds significance level
+        var p := 0;
+        var n% := -1; 
+        while (p<1-alphaLevel) do
+            n% := n% + 1;            
+            p := p+poiss(expectedNumSpikes,n%);
+            'PrintLog("SpikesRequiredAcrossAllTrails,%d,%f\n",n%,p);  
+        wend;
+        
+        PrintLog("ExpectedNumberOfSpikesAcrossAllTrials,%f\n",expectedNumSpikes);
+        PrintLog("NumberOfSpikesRequiredAcrossAllTrailsForSignificance,%d,%f\n",n%,1-p);  
+
+    endif;
+endif;
+
+' Compute Factorial
+func factorial(n%) 
+
+    var fact := 1;
+    var ntmp%;
+    for ntmp% := 1 to n% do
+        fact := fact*ntmp%;
+    next;
+
+    return fact;
+end;
+
+' Compute Poisson
+func poiss(r,n%)
+    var tmp := exp(-r)*pow(r,n%)/factorial(n%);
+    return tmp;
+end;

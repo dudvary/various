@@ -1,0 +1,44 @@
+' Select Marker Channel and extract times for events
+' Print events in PrintLog
+' First load in .smr data file (has to be selected in foreground)
+' then run getEventTimes.s2s
+' ------------------------------------------------
+' Authors: Daniel Udvary
+' Date: August 8th 2018
+' Version: 1
+' ------------------------------------------------
+
+' Open Dialog Box to set Marker Channel
+var markerCh% := 4;
+
+DlgCreate("Select Marker Channel");
+DlgChan(1,"Marker Channel",22);
+var ok := DlgShow(markerCh%);
+
+'If pressed OK
+if ok=1 then
+    
+    ' Check if there are any Events in Channel
+    var numEvents% := Count(markerCh%,0,MaxTime());
+    
+    if numEvents% > 0 then
+        
+        var currEvent% := 1;
+        var t := -1; 
+        
+        PrintLog("%d events found in Channel %d\n",numEvents%,markerCh%);  
+        PrintLog("#event,time,\n");          
+        
+        while currEvent% <= numEvents% do
+            
+            t := NextTime(markerCh%,t);
+            PrintLog("%d,%.3f,\n",currEvent%,t);  
+            currEvent% := currEvent% + 1;
+        wend;
+        
+    else
+        PrintLog("No events found in Channel %d\n",markerCh%);
+    endif;
+    
+    FrontView(LogHandle())
+endif;

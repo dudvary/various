@@ -1,0 +1,78 @@
+' Compute Number of Spikes needed to be above significance level of Poisson Distribution
+'   User is asked to select Settings 
+'       number of trials 
+'       bin size/width [in seconds], 
+'       spontaneous activity [in Hertz], 
+'       significance level [between 0 and 1]
+'
+' Compute p value for each number of spikes until significance level is reached
+'   prints each spike number and p value
+'   prints Significance Level used for analysis
+'   prints SpontaneousActivity used for analysis
+'   prints BinSize used for analysis
+'   prints ExpectedNumberOfSpikesAcrossAlltrials
+'   prints NumberOfSpikesRequiredAcrossAlltrialsForSignificance
+' ------------------------------------------------
+' Authors: Daniel Udvary
+' Date: May 31th 2018
+' Version: 1
+' ------------------------------------------------
+
+    
+var binsz := 0.001;
+var spontActivity := 1;
+var alphaLevel := 0.01;
+var numtrials% := 30;
+
+' Open Dialog Box for Channel Settings to extract Spike Latencies
+DlgCreate("Calculate Spikes required to be above threshold");
+DlgInteger(1,"Number of trials",1,10000);
+DlgReal(2,"bin size [in seconds]",0,60);
+DlgReal(3,"Spontaneous Activity [in Hertz]",0,10000);
+DlgReal(4,"Significance Level",0,1);
+var ok := DlgShow(numtrials%,binsz,spontActivity,alphaLevel);
+
+'If pressed OK
+if ok=1 then
+    
+    var expectedNumSpikes := spontActivity * binsz * numtrials%; 
+    
+    PrintLog("--------------------------------------\n");
+    PrintLog("LessOrEqualNumberOfSpikes,Probability,\n");
+    ' Compute when poisson probability exceeds significance level
+    var p := 0;
+    var n% := -1; 
+    while (p<1-alphaLevel) do
+        n% := n% + 1;            
+        p := p+poiss(expectedNumSpikes,n%);
+        PrintLog("%d,%f,\n",n%,p);  
+    wend;
+    PrintLog("--------------------------------------\n");
+    
+    PrintLog("SignificanceLevel,%f,\n", alphaLevel);
+    PrintLog("SpontaneousActivity[Hz],%f,\n", spontActivity);
+    PrintLog("BinSize[s],%f,\n", binsz);
+    PrintLog("NumberOfTrials,%d,\n", numtrials%);  
+    PrintLog("ExpectedNumberOfSpikesAcrossAllTrials(SpontaneousActivity*BinSize*NumberOftrials),%f\n",expectedNumSpikes);
+    PrintLog("NumberOfSpikesRequiredAcrossAlltrialsForSignificance,%d,%f\n",n%,1-p);  
+    
+    FrontView(LogHandle())
+endif;
+
+' Compute Factorial
+func factorial(n%) 
+
+    var fact := 1;
+    var ntmp%;
+    for ntmp% := 1 to n% do
+        fact := fact*ntmp%;
+    next;
+
+    return fact;
+end;
+
+' Compute Poisson
+func poiss(r,n%)
+    var tmp := exp(-r)*pow(r,n%)/factorial(n%);
+    return tmp;
+end;
