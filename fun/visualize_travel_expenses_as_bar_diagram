@@ -1,0 +1,30 @@
+# Converted from juypter notebook script
+# Read in excel sheet containing daily travel expenses 
+# visualize daily expenses as stacked bar graph sorted by country and category
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load excel spreadsheet into a pandas DataFrame
+# Column 1: Country
+# Column 2-6: Daily expenses in Euro
+# Column 2: Accommodation
+# Column 3: Food&Drinks
+# Column 4: Entertainment
+# Column 5: Transportation
+# Column 6: Other
+df = pd.read_excel("Travel_Expenses.xlsx")
+df.iloc[:, 1:] = df.iloc[:, 1:].div(2) # Divide all expenses by 2 to get expenses per person
+colors = sns.color_palette("hls", n_colors=df.shape[1]) # set colors
+
+# Plot
+ax = df.plot(kind="bar", stacked=True, x='Country', ylabel='Daily expenses per person in €', color=colors, xlabel='', figsize=(8,5))
+ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.xticks(rotation=45)
+plt.grid(axis="y", which="both", alpha=0.5)
+ax.set_axisbelow(True)
+plt.title("Daily expenses by country and category (excl. flights)")
+plt.tight_layout()
+plt.show()
+# Save Figure as jpg
+ax.figure.savefig("graph.jpg", dpi=300)
