@@ -1,12 +1,19 @@
-# Visualizes summary excel sheet (xls sheet, as exported by the Splid App) as Pie Chart and Bar Diagram
+# Visualizes summary excel sheet (as exported by the Splid App) 
+# as pie chart and bar diagram grouped by group members and category 
 # Link to Splid App: https://splid.app/german
 #
-# Tested for a Splid group of two persons (should work with 2 or more persons)
-# with multiple currencies. Script converts currencies to the currency set on the Splid App (here: EUR)
+# Tested for 
+# - "summary" xls excel sheet exported by Splid Version 1.3 (130016)
+# - a Splid group of two persons (should work with at least 2 persons) with purchases in multiple currencies. 
+#   Script converts currencies to the currency set on the Splid App (here: EUR)
 #
-# Requirements of exported excel sheet:
-# - Splid sheet should contain two sheets named "Zusammenfassung" and "Währungen"
-# - Splid needs to be set to German language (to export the excel sheets in German; otherwise the Sheet names will differ)
+# Input to the script is the "summary" excel sheet that can be exported in the Splid App
+# under "Abrechnen" > "Zusammenfassung" > "Excel"
+# Requirements of Splid exported "summary" excel sheet:
+# - Sheet has to contain two sheets named "Zusammenfassung" and "Währungen" 
+#   Tick "Währungskurse" when exporting to get "Währungen" sheet
+# - Splid has to be set to German language (exported sheet names need to be in German)
+# - Categories need to be set for the purchases
 
 # Import packages
 import numpy as np
@@ -226,17 +233,17 @@ def plot_bar_graph(df):
     plt.show()
 
 # Main 
-# Process files and load as DataFrame and Dictionary
+# Process sheet and load summary sheet as DataFrame and currency sheet as dictionary
 df, currencyDict = process_splid_files(filename)
-# Pseudonymize member names (if desired)
+# Pseudonymize member names (optional step)
 df = pseudonymize_members(df)
-# Extract member names and column indices
+# Extract member names and respetive column indices of DataFrame
 members, idx_members_expenses = get_members(df)
 # Clean DataFrame
 df = clean_df(df,currencyDict, idx_members_expenses)
-# Get Table grouped by Category
+# Get Table as DataFrame grouped by category
 dfCategory = get_expenses_by_category(df)
 
-# Visualize table as pie chart and as bar graph
+# Visualize table as pie chart and as bar graph per member and category
 plot_pie_chart(df, members)
 plot_bar_graph(df)
